@@ -11,5 +11,5 @@ services:
       - key: FLASK_DEBUG
         value: "0"
       - key: FRONTEND_ORIGIN
-        value: https://atlas-service-desk-frontend.vercel.app
+        value: https://atlas-service-desk-fullstack.vercel.app
     healthCheckPath: /api/requests
