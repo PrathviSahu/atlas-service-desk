@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: atlas-service-desk-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    envVars:
+      - key: DATABASE_PATH
+        value: ./atlas.db
+      - key: PORT
+        value: 5001
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: FRONTEND_ORIGIN
+        value: https://atlas-service-desk.vercel.app
+    healthCheckPath: /api/requests

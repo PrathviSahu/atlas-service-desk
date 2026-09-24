@@ -1,7 +1,10 @@
 import axios from 'axios'
 
+// Dev: Vite proxy handles /api → localhost:5001 (vite.config.js)
+// Production: VITE_API_BASE must be set to the deployed backend URL
+// e.g. https://atlas-service-desk-api.onrender.com/api
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE || '/api',
   headers: { 'Content-Type': 'application/json' },
 })
 
