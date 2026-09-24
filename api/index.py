@@ -1,38 +1,91 @@
 """
 Vercel Python serverless entry point for Atlas Service Desk.
 
-SQLite lives in /tmp (ephemeral per Vercel instance). The database is
-seeded automatically on cold start so the demo data is always present.
+SQLite lives in /tmp (ephemeral on Vercel). Demo data is seeded inline
+on every cold start so the evaluator always sees R101-R108 / T1-T3.
 """
-import sys, os, pathlib
+import sys, os, pathlib, sqlite3
 
-# Add backend/ to Python path so all app imports resolve
 _root = pathlib.Path(__file__).parent.parent
 sys.path.insert(0, str(_root / 'backend'))
 
-os.environ['DATABASE_PATH'] = '/tmp/atlas.db'
+DB_PATH = '/tmp/atlas.db'
+os.environ['DATABASE_PATH'] = DB_PATH
 os.environ['FRONTEND_ORIGIN'] = '*'
 
-from app import create_app   # this also creates the DB schema via init_db()
+from app import create_app          # creates the schema via init_db()
+from app.models.database import init_db
 
 app = create_app()
 
-# Seed demo data on cold start.
-# create_app already created the tables; seed.py inserts the rows.
-# Safe to call every cold start — seed.py does DELETE then INSERT OR REPLACE.
-def _seed():
+# ── Inline seed ────────────────────────────────────────────────────────────
+# Seeds unconditionally on every cold start.
+# init_db() already ran inside create_app(), so the tables exist.
+_TECHNICIANS = [
+    ("T1", "Alex Morgan",  "available"),
+    ("T2", "Jordan Lee",   "available"),
+    ("T3", "Sam Rivera",   "available"),
+]
+
+_REQUESTS = [
+    # (id, customer, channel, message, received_at, priority, status,
+    #  technician_id, is_dup, dup_of, needs_clarif, missing_info, notes)
+    ("R101","C01","email",
+     "Cold-room unit keeps stopping. Stored goods could be affected.",
+     "2026-09-30T16:10:00","urgent","open",None,0,None,0,None,
+     "Received via email. Stored goods at risk — urgent."),
+    ("R102","C02","whatsapp",
+     "Can you confirm when someone is coming for yesterday's pump request?",
+     "2026-10-01T08:20:00","high","assigned","T1",0,None,0,None,
+     "Assigned T1; no visit time recorded."),
+    ("R103","C03","phone",
+     "Routine inspection request for next week.",
+     "2026-09-30T11:00:00","normal","open",None,0,None,0,None,None),
+    ("R104","C01","email",
+     "Following up on the cold-room fault reported yesterday.",
+     "2026-10-01T08:25:00","urgent","open",None,0,None,0,None,
+     "Possible duplicate of R101 — same customer, cold-room issue."),
+    ("R105","C04","phone",
+     "Machine not working. Please call us.",
+     "2026-10-01T08:30:00","normal","open",None,0,None,1,
+     "Equipment identifier missing",None),
+    ("R106","C05","email",
+     "We are waiting for the replacement part and an update.",
+     "2026-09-29T14:00:00","normal","waiting","T2",0,None,0,None,
+     "Assigned T2; waiting for replacement part."),
+    ("R107","C06","whatsapp",
+     "Thanks, the unit is running again.",
+     "2026-09-30T15:00:00","normal","in_progress","T3",0,None,0,None,
+     "Customer confirmed resolved — update status to Resolved."),
+    ("R108","C07","email",
+     "Please send someone today for a pressure warning.",
+     "2026-10-01T08:40:00","urgent","open",None,0,None,1,
+     "Equipment identifier missing",None),
+]
+
+def _seed_db():
     try:
-        import importlib.util
-        seed_path = _root / 'backend' / 'seed.py'
-        spec = importlib.util.spec_from_file_location('seed', seed_path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("DELETE FROM requests")
+        conn.execute("DELETE FROM technicians")
+        for t in _TECHNICIANS:
+            conn.execute(
+                "INSERT OR REPLACE INTO technicians (id, name, status) VALUES (?,?,?)", t)
+        for r in _REQUESTS:
+            conn.execute("""
+                INSERT OR REPLACE INTO requests
+                  (id, customer_id, channel, message, received_at, priority, status,
+                   technician_id, is_duplicate, duplicate_of,
+                   needs_clarification, missing_information, notes)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""", r)
+        conn.commit()
+        conn.close()
+        print(f"[atlas] seeded {len(_TECHNICIANS)} technicians, {len(_REQUESTS)} requests", flush=True)
     except Exception as exc:
-        # Log but don't crash — the app still works with an empty DB
-        print(f'[atlas] auto-seed failed: {exc}', flush=True)
+        print(f"[atlas] seed error: {exc}", flush=True)
 
-with app.app_context():
-    _seed()
+_seed_db()
 
-# Vercel looks for a callable named 'app' or 'handler'
+# Vercel looks for 'app' or 'handler'
 handler = app
