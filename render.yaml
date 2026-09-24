@@ -8,10 +8,8 @@ services:
     envVars:
       - key: DATABASE_PATH
         value: ./atlas.db
-      - key: PORT
-        value: 5001
       - key: FLASK_DEBUG
         value: "0"
       - key: FRONTEND_ORIGIN
-        value: https://atlas-service-desk.vercel.app
+        value: https://atlas-service-desk-frontend.vercel.app
     healthCheckPath: /api/requests

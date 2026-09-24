@@ -36,7 +36,54 @@ This product replaces that spreadsheet with an operational queue that handles:
 | Styling | Vanilla CSS (no framework) |
 | Tests | pytest (28 tests) |
 
-No external services. No authentication. No paid APIs. Runs fully locally.
+No authentication. No paid APIs. Runs fully locally for development.
+
+---
+
+## Deployment
+
+The production setup uses two services:
+
+```
+React Frontend  →  Vercel
+Flask Backend   →  Render (Flask + SQLite)
+```
+
+The frontend communicates with the backend via `VITE_API_BASE`. For local development, Vite's proxy handles `/api` → `localhost:5001` automatically.
+
+### Deploy the backend (Render)
+
+1. Go to [render.com](https://render.com) → New Web Service → Connect `PrathviSahu/atlas-service-desk`
+2. Render will detect `render.yaml` automatically. Settings:
+   - **Root directory:** `backend`
+   - **Build command:** `pip install -r requirements.txt`
+   - **Start command:** `python run.py`
+3. Add environment variables in Render dashboard:
+   - `DATABASE_PATH` = `./atlas.db`
+   - `FRONTEND_ORIGIN` = `https://<your-vercel-url>.vercel.app`
+4. After first deploy, run the seed: `python seed.py` via Render Shell, or it auto-seeds on startup when the DB is empty.
+
+### Deploy the frontend (Vercel)
+
+```bash
+cd frontend
+vercel --prod --yes
+```
+
+Set the environment variable in Vercel dashboard (or CLI):
+```bash
+vercel env add VITE_API_BASE production
+# Enter: https://<your-render-service>.onrender.com/api
+```
+
+Then redeploy:
+```bash
+vercel --prod --yes
+```
+
+### CORS
+
+The backend `FRONTEND_ORIGIN` env var must exactly match your Vercel URL. Update it in the Render dashboard if your Vercel URL differs from the default.
 
 ---
 
